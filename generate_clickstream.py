@@ -24,7 +24,7 @@ def generate_event():
     timestamp = datetime.utcnow()
     return {
         "event_id": str(uuid.uuid4()),
-        "user_id": random.randint(1, 3),
+        "user_id": random.randint(1, 100),
         "event_type": random.choice(EVENT_TYPES),
         "timestamp": timestamp.isoformat(),
         "event_date": timestamp.strftime("%Y-%m-%d"),
@@ -47,4 +47,4 @@ def generate_streaming_data(total_batches=10, batch_size=100, interval_seconds=5
         time.sleep(interval_seconds)
 
 if __name__ == "__main__":
-    generate_streaming_data(total_batches=5, batch_size=3, interval_seconds=5)
+    generate_streaming_data(total_batches=10, batch_size=100, interval_seconds=5)

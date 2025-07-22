@@ -2,6 +2,9 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import col, to_timestamp
 from pyspark.sql.types import *
 
+from hudi_config.cow_options import get_cow_options
+from hudi_config.mor_options import get_mor_options
+
 spark = SparkSession.builder \
     .appName("Hudi Ingest Clickstream") \
     .config("spark.serializer", "org.apache.spark.serializer.KryoSerializer") \
@@ -14,11 +17,15 @@ spark = SparkSession.builder \
 # spark.sparkContext.setLogLevel("WARN")
 
 # Hudi options
-hudi_table_path = "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/data/output/default/hudi_clickstream"   # or s3://your-bucket/hudi-table/
-hudi_table_name = "hudi_clickstream"
+table_type = "mor"
+hudi_table_name = "hudi_clickstream_" + table_type
+hudi_table_path = "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/data/output/default/" + hudi_table_name   # or s3://your-bucket/hudi-table/
 record_key = "user_id"
 precombine_key = "timestamp"
 partition_key = "event_date"
+
+# checkpoint
+checkpoint_path = "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/checkpoints"
 
 # Define schema
 schema = StructType([
@@ -36,42 +43,23 @@ schema = StructType([
 input_path = "data/raw"
 df = (spark.readStream
       .schema(schema)
-      .option("maxFilesPerTrigger", 3) # simulate micro-batch
+      .option("maxFilesPerTrigger", 1) # simulate micro-batch
       .json(input_path))
 
 # Convert timestamp column to proper format
 df = df.withColumn("timestamp", to_timestamp(col("timestamp")))
 
 # Write to Hudi
-hudi_options = {
-    "hoodie.table.name": hudi_table_name,
-    "hoodie.datasource.write.recordkey.field": record_key,
-    "hoodie.datasource.write.partitionpath.field": partition_key,
-    "hoodie.datasource.write.precombine.field": precombine_key,
-    "hoodie.datasource.write.table.type": "COPY_ON_WRITE",
-    "hoodie.datasource.write.operation": "upsert",
-    "hoodie.datasource.write.hive_style_partitioning": "true",
-
-    # ✅ Bucket indexing config
-    "hoodie.index.type": "BUCKET",
-    "hoodie.bucket.index.num.buckets": "2",
-    "hoodie.bucket.index.hash.field": record_key,
-
-    # ✅ Hive Sync options
-    "hoodie.datasource.hive_sync.enable": "true",
-    "hoodie.datasource.hive_sync.mode": "hms",  # Use HMS directly (recommended)
-    "hoodie.datasource.hive_sync.database": "default",
-    "hoodie.datasource.hive_sync.table": hudi_table_name,
-    "hoodie.datasource.hive_sync.partition_fields": "event_date",
-    "hoodie.datasource.hive_sync.support_timestamp": "true",
-    "hoodie.datasource.hive_sync.use_jdbc": "false",
-    "hoodie.datasource.hive_sync.metastore.uris": "thrift://localhost:9083"
-}
+hudi_options = None
+if table_type == "cow":
+    hudi_options = get_cow_options(hudi_table_name, record_key, partition_key, precombine_key)
+elif table_type == "mor":
+    hudi_options = get_mor_options(hudi_table_name, record_key, partition_key, precombine_key)
 
 df.writeStream.format("hudi") \
     .options(**hudi_options) \
     .outputMode("append") \
-    .option("checkpointLocation", "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/checkpoints/clickstream_hudi") \
+    .option("checkpointLocation", checkpoint_path) \
     .trigger(processingTime='20 seconds') \
     .start(hudi_table_path) \
     .awaitTermination()

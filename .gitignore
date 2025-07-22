@@ -2,3 +2,4 @@ checkpoints/
 data/output/
 data/raw/
 .idea/
+src/hudi_config/__pycache__/
