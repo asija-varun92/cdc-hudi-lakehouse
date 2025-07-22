@@ -1,5 +1,8 @@
-checkpoints/
-data/output/
-data/raw/
+checkpoints/*
+!checkpoints/.gitkeep
+data/output/*
+!data/output/.gitkeep
+data/raw/*
+!data/raw/.gitkeep
 .idea/
 src/hudi_config/__pycache__/
