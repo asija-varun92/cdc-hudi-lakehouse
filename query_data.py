@@ -17,7 +17,7 @@ spark.sql("USE default")
 
 # List tables
 # spark.sql("SHOW TABLES").show()
-spark.sql("SELECT user_id, event_type, timestamp, session_id, page_url, country, event_date FROM hudi_clickstream;").show()
+spark.sql("SELECT user_id, event_type, timestamp, session_id, page_url, country, event_date FROM hudi_clickstream_mor;").show()
 # spark.sql("SELECT * FROM hudi_clickstream;").show()
 
 # # View schema of a specific table
