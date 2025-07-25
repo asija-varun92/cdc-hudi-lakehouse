@@ -1,9 +1,7 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, to_timestamp
-from pyspark.sql.types import *
+from pyspark.sql.functions import col, from_json
 
-from hudi_config.cow_options import get_cow_options
-from hudi_config.mor_options import get_mor_options
+from utils.hudi_writer import write_to_hudi
 
 spark = SparkSession.builder \
     .appName("Hudi Ingest Clickstream") \
@@ -14,62 +12,37 @@ spark = SparkSession.builder \
     .enableHiveSupport() \
     .getOrCreate()
 
-# spark.sparkContext.setLogLevel("WARN")
+spark.sparkContext.setLogLevel("WARN")
 
-# Hudi options
 table_type = "mor"
-hudi_table_name = "hudi_clickstream_" + table_type
-hudi_table_path = "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/data/output/default/" + hudi_table_name   # or s3://your-bucket/hudi-table/
-record_key = "user_id"
-precombine_key = "timestamp"
-partition_key = "event_date"
 
-# checkpoint
-checkpoint_path = "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/checkpoints"
+# input data
+input_servers = "localhost:29092"
+kafka_topic = "inventory.inventory.products,inventory.inventory.customers"
 
-# Define schema
-schema = StructType([
-    StructField("event_id", StringType(), True),
-    StructField("user_id", IntegerType(), True),
-    StructField("event_type", StringType(), True),
-    StructField("timestamp", StringType(), True),
-    StructField("event_date", StringType(), True),
-    StructField("session_id", StringType(), True),
-    StructField("page_url", StringType(), True),
-    StructField("country", StringType(), True),
-])
+base_path = "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/data/output/default/"
 
-# Read micro-batch JSON files (written by your data generator)
-input_path = "data/raw"
-df = (spark.readStream
-      .schema(schema)
-      .option("maxFilesPerTrigger", 1) # simulate micro-batch
-      .json(input_path))
+# Read from Kafka
+messages_df = spark.readStream \
+    .format("kafka") \
+    .option("kafka.bootstrap.servers", input_servers) \
+    .option("subscribe", kafka_topic) \
+    .option("startingOffsets", "latest") \
+    .load()
 
-# Convert timestamp column to proper format
-df = df.withColumn("timestamp", to_timestamp(col("timestamp")))
+raw_df = messages_df.select(col("topic"), col("value").cast("string").alias("str_data"))
 
 # Write to Hudi
-hudi_options = None
-if table_type == "cow":
-    hudi_options = get_cow_options(hudi_table_name, record_key, partition_key, precombine_key)
-elif table_type == "mor":
-    hudi_options = get_mor_options(hudi_table_name, record_key, partition_key, precombine_key)
-
-df.writeStream.format("hudi") \
-    .options(**hudi_options) \
-    .outputMode("append") \
-    .option("checkpointLocation", checkpoint_path) \
+raw_df.writeStream \
+    .foreachBatch(lambda df, bid: write_to_hudi(df, bid, table_type, base_path)) \
+    .option("checkpointLocation", f"checkpoints/multi-topic-stream") \
     .trigger(processingTime='20 seconds') \
-    .start(hudi_table_path) \
+    .start() \
     .awaitTermination()
-
-print(f"✅ Hudi table written to {hudi_table_path}")
-
 
 
 """
  spark-submit \
-  --packages org.apache.hudi:hudi-spark3.5-bundle_2.12:1.0.0 \
+  --packages org.apache.hudi:hudi-spark3.5-bundle_2.12:1.0.0,org.apache.spark:spark-sql-kafka-0-10_2.12:3.5.0 \
   main.py
 """
