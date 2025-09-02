@@ -21,7 +21,8 @@
       "plugin.name": "pgoutput",
       "slot.name": "debezium",
       "publication.name": "debezium_pub",
-      "topic.prefix": "inventory"
+      "topic.prefix": "inventory",
+      "snapshot.mode": "initial"
     }}'
    ```
 3. Connect to db with creds below:
