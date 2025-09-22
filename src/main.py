@@ -1,5 +1,5 @@
 from pyspark.sql import SparkSession
-from pyspark.sql.functions import col, from_json
+from pyspark.sql.functions import col
 
 from utils.hudi_writer import write_to_hudi
 
@@ -14,7 +14,7 @@ spark = SparkSession.builder \
 
 spark.sparkContext.setLogLevel("WARN")
 
-table_type = "mor"
+table_type = "cow"
 
 # input data
 input_servers = "localhost:29092"
@@ -27,16 +27,17 @@ messages_df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", input_servers) \
     .option("subscribe", kafka_topic) \
-    .option("startingOffsets", "latest") \
+    .option("startingOffsets", "earliest") \
     .load()
 
+messages_df = messages_df.filter(messages_df["value"].isNotNull()) # handles null from debezium when row is deleted
 raw_df = messages_df.select(col("topic"), col("value").cast("string").alias("str_data"))
 
 # Write to Hudi
 raw_df.writeStream \
     .foreachBatch(lambda df, bid: write_to_hudi(df, bid, table_type, base_path)) \
     .option("checkpointLocation", f"checkpoints/multi-topic-stream") \
-    .trigger(processingTime='20 seconds') \
+    .trigger(processingTime='30 seconds') \
     .start() \
     .awaitTermination()
 
