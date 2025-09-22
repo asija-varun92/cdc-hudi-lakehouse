@@ -30,6 +30,7 @@ messages_df = spark.readStream \
     .option("startingOffsets", "earliest") \
     .load()
 
+messages_df = messages_df.filter(messages_df["value"].isNotNull()) # handles null from debezium when row is deleted
 raw_df = messages_df.select(col("topic"), col("value").cast("string").alias("str_data"))
 
 # Write to Hudi

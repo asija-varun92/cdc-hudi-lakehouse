@@ -5,7 +5,8 @@ def get_message_schema(table_schema):
 
     # Schema for "payload" block
     payload_schema = StructType([
-        StructField("after", table_schema, True),
+        StructField("before", table_schema, False),
+        StructField("after", table_schema, False),
         StructField("op", StringType(), False),
         StructField("ts_ms", LongType(), True),
     ])
