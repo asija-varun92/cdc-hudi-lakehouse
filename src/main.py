@@ -22,12 +22,12 @@ kafka_topic = "inventory.inventory.products,inventory.inventory.customers"
 
 base_path = "file:///Users/varun_asija/Documents/cdc-hudi-lakehouse/data/output/default/"
 
-# Read from Kafka
+# Read from Kafka with earliest or latest 
 messages_df = spark.readStream \
     .format("kafka") \
     .option("kafka.bootstrap.servers", input_servers) \
     .option("subscribe", kafka_topic) \
-    .option("startingOffsets", "earliest") \
+    .option("startingOffsets", "latest") \
     .load()
 
 messages_df = messages_df.filter(messages_df["value"].isNotNull()) # handles null from debezium when row is deleted

@@ -15,11 +15,10 @@ spark.sparkContext.setLogLevel("WARN")
 # Switch to a database (default is the default)
 spark.sql("USE default")
 
-# List tables
-# spark.sql("SHOW TABLES").show()
+spark.sql("DROP TABLE IF EXISTS products;")
 
-# spark.sql("SELECT count(*) as Customers_count FROM customers;").show()
-spark.sql("SELECT * FROM products;").show()
+# List tables
+spark.sql("SHOW TABLES").show()
 
 # # View schema of a specific table
 # spark.sql("DESCRIBE FORMATTED products").show(truncate=False)
